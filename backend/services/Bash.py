@@ -2,6 +2,9 @@ import asyncio
 import fcntl
 import pty
 import os
+import struct
+import termios
+
 
 class Bash:
     def __init__(self):
@@ -14,6 +17,16 @@ class Bash:
         
         # 设置非阻塞
         fcntl.fcntl(self.fd, fcntl.F_SETFL, fcntl.fcntl(self.fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+
+        TIOCSWINSZ = getattr(termios, 'TIOCSWINSZ', -2146929561)
+
+        def set_winsize(fd, rows, cols):
+            # 参数顺序：rows, cols
+            s = struct.pack('HHHH', rows, cols, 0, 0)
+            fcntl.ioctl(fd, TIOCSWINSZ, s)
+
+        # 初始大小
+        set_winsize(self.fd, 24, 90)
 
         # 获取事件循环
         loop = asyncio.get_running_loop()

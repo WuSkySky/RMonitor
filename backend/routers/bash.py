@@ -1,38 +1,23 @@
 from fastapi import APIRouter
-from fastapi import WebSocket
+import base64
 import asyncio
 from backend.services.Bash import Bash
+from backend.services.WebSocketManger import on_ws_message, ws_send
 
 # 陆游
 router = APIRouter()
 
-# websocket
-@router.websocket("/ws/term")
-async def websocket_endpoint(ws: WebSocket):
-    bash = Bash()
+bash = Bash() 
 
-    # bash.create_bash_process()
+@on_ws_message('1')
+async def msg_callback(data):
+    data_bytes=base64.b64decode(data)
+    bash.send(data_bytes)
 
-    # 等待websocket连接建立
-    await ws.accept()
+async def bash_to_frontend():
+    while True:
+        data = (await bash.read())
+        data_str=base64.b64encode(data).decode("utf-8")
+        await ws_send('1', data_str)
 
-    # 前端输入发送到bash
-    async def frontend_to_bash():
-        while True:
-            data = await ws.receive_text()
-            print("RECV:\t ", repr(data))
-            bash.send(data.encode())
-
-    task_frontend_to_bash = asyncio.create_task(frontend_to_bash())
-
-    # bash输出发送到前端
-    async def bash_to_frontend():
-        while True:
-            data = (await bash.read())
-            print("BASH:\t ", data.decode())
-            await ws.send_bytes(data)
-
-    task_bash_to_frontend = asyncio.create_task(bash_to_frontend())
-
-    # 等待两个任务完成(永远不会完成, 保持函数不返回)
-    await asyncio.wait([task_frontend_to_bash, task_bash_to_frontend])
+task_bash_to_frontend = asyncio.create_task(bash_to_frontend())
